@@ -5,6 +5,9 @@ const bodyParser = require('body-parser')
 const ejs = require('ejs')
 const mongoose = require('mongoose')
 const encrypt = require('mongoose-encryption')
+const bcrypt = require('bcrypt')
+
+const saltRounds = 10
 
 const app = express()
 mongoose.connect('mongodb://localhost:27017/secretsDB')
@@ -36,17 +39,21 @@ app.route('/register')
     const email = req.body.username
     const password = req.body.password
 
-    const newUser = new User({
-        email: email,
-        password: password
+    bcrypt.hash(password, saltRounds, (err,hash)=>{
+        const newUser = new User({
+            email: email,
+            password: hash
+        })
+        newUser.save((err)=>{
+            if(err){
+                res.send(err)
+            }else{
+                res.render('secrets')
+            }
+        })
     })
-    newUser.save((err)=>{
-        if(err){
-            res.send(err)
-        }else{
-            res.render('secrets')
-        }
-    })
+
+   
 });
 
 app.route('/login')
@@ -54,16 +61,21 @@ app.route('/login')
     res.render('login',{})
 })
 .post((req,res)=>{
-    User.findOne({email:req.body.username},(err,foundUser)=>{
+    const email = req.body.username
+    const password = req.body.password
+
+    User.findOne({email:email},(err,foundUser)=>{
         if(err){
             res.send(err)
         }else{
             if(foundUser){
-                if(foundUser.password === req.body.password){
+               bcrypt.compare(password, foundUser.password, (err, result)=>{
+                if(result === true){
                     res.render('secrets')
                 }else{
-                    res.send('The password or login is typed wrong')
+                    res.send('The password typed wrong')
                 }
+               })
             }else{
                 res.send('No such user was found')
             }
